@@ -74,7 +74,7 @@ class Cache
 
     // Retrieves a page from the cache, also removes the page from the cache
     // and re-inserts it at the front. Returns null if the page was not cached.
-    Page *get_page(uint64_t address, uint32_t flags = 0) {
+    Page *get(uint64_t address, uint32_t flags = 0) {
       size_t hash = calc_hash(address);
 
       ScopedSpinlock lock(m_mutex);
@@ -94,11 +94,13 @@ class Cache
       m_totallist.add(page);
 
       m_cache_hits++;
+
+      page->lock();
       return (page);
     }
 
     // Stores a page in the cache
-    void put_page(Page *page) {
+    void put(Page *page) {
       size_t hash = calc_hash(page->get_address());
       ham_assert(page->get_data());
 
@@ -119,9 +121,9 @@ class Cache
     }
 
     // Removes a page from the cache
-    void remove_page(Page *page) {
+    void remove(Page *page) {
       ScopedSpinlock lock(m_mutex);
-      remove_page_unlocked(page);
+      remove_unlocked(page);
     }
 
     typedef void (*PurgeCallback)(Page *page, PageManager *pm);
@@ -166,7 +168,7 @@ class Cache
   private:
     friend struct PageCollectionPurgeIfCallback;
 
-    void remove_page_unlocked(Page *page) {
+    void remove_unlocked(Page *page) {
       ham_assert(page->get_address() != 0);
       size_t hash = calc_hash(page->get_address());
       /* remove the page from the cache buckets */

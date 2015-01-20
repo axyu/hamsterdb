@@ -160,7 +160,7 @@ class PageManager {
 
     // Returns true if a page is free. Ignores multi-pages; only for
     // testing and integrity checks
-    bool is_page_free(uint64_t pageid) {
+    bool test_is_page_free(uint64_t pageid) {
       FreeMap::iterator it = m_free_pages.find(pageid);
       return (it != m_free_pages.end());
     }
@@ -172,12 +172,12 @@ class PageManager {
 
     // Fetches a page from the list
     Page *fetch_page(uint64_t id) {
-      return (m_cache.get_page(id));
+      return (m_cache.get(id));
     }
 
     // Stores a page in the list
     void store_page(Page *page, uint32_t flags = 0) {
-      m_cache.put_page(page);
+      m_cache.put(page);
 
       /* write to disk (if necessary) */
       if (!(flags & kDisableStoreState) && !(flags & kReadOnly))

@@ -25,6 +25,7 @@
 #include <string.h>
 
 #include "1base/error.h"
+#include "1base/spinlock.h"
 #include "1mem/mem.h"
 
 namespace hamsterdb {
@@ -367,6 +368,16 @@ class Page {
       m_node_proxy = proxy;
     }
 
+    // Locks the page
+    void lock() {
+      m_mutex.lock();
+    }
+
+    // Unlocks the page
+    void unlock() {
+      m_mutex.unlock();
+    }
+
   private:
     friend class PageCollection;
 
@@ -388,6 +399,9 @@ class Page {
 
     // address of this page
     uint64_t m_address;
+
+    // Spinlock: if it's locked then the page is in use
+    Spinlock m_mutex;
 
     // Page buffer was allocated with malloc() (if not then it was mapped
     // with mmap)

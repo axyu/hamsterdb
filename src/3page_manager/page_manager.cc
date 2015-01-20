@@ -259,7 +259,7 @@ PageManager::fetch_page(LocalDatabase *db, uint64_t address,
   Page *page = 0;
 
   /* fetch the page from the cache */
-  page = m_cache.get_page(address);
+  page = m_cache.get(address);
   if (page) {
     ham_assert(page->get_data());
     if (flags & kNoHeader)
@@ -384,6 +384,7 @@ done:
       break;
   }
 
+  page->lock();
   return (page);
 }
 
@@ -487,6 +488,8 @@ PageManager::flush_all_pages(bool nodelete)
 
   if (m_state_page)
     flush_page(m_state_page);
+
+  m_env->get_changeset().clear();
 }
 
 void
@@ -542,9 +545,9 @@ PageManager::reclaim_space()
   while (m_free_pages.size() > 1) {
     FreeMap::iterator fit = m_free_pages.find(file_size - page_size);
     if (fit != m_free_pages.end()) {
-      Page *page = m_cache.get_page(fit->first);
+      Page *page = m_cache.get(fit->first);
       if (page) {
-        m_cache.remove_page(page);
+        m_cache.remove(page);
         delete page;
       }
       file_size -= page_size;
@@ -624,7 +627,7 @@ PageManager::close()
 void
 PageManager::test_remove_page(Page *page)
 {
-  m_cache.remove_page(page);
+  m_cache.remove(page);
   m_env->get_changeset().clear();
 }
 

@@ -40,7 +40,7 @@ struct PageCollectionPurgeIfCallback
 
   bool operator()(Page *page) {
     if (m_cb(page, m_env, m_db, m_flags)) {
-      m_cache->remove_page_unlocked(page);
+      m_cache->remove_unlocked(page);
       delete page;
     }
     return (false); // don't remove page from list; it was already removed above
@@ -109,7 +109,7 @@ Cache::purge(Cache::PurgeCallback cb, PageManager *pm)
     Page *page = m_totallist.find_first_reverse(visitor);
     if (!page)
       break;
-    remove_page_unlocked(page);
+    remove_unlocked(page);
     cb(page, m_env->get_page_manager()); // TODO also in locked context?
   }
 }

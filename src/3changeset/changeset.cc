@@ -47,9 +47,18 @@ Changeset::get_page(uint64_t pageid)
   return (m_collection.get(pageid));
 }
 
+struct UnlockPages
+{
+  void operator()(Page *page) {
+    page->unlock();
+  }
+};
+
 void
 Changeset::clear()
 {
+  UnlockPages visitor;
+  m_collection.for_each(visitor);
   m_collection.clear();
 }
 
