@@ -55,6 +55,8 @@ struct DuplicateFixture {
   }
 
   void teardown() {
+    LocalEnvironment *lenv = (LocalEnvironment *)m_env;
+    lenv->get_changeset().clear();
     REQUIRE(0 == ham_env_close(m_env, HAM_AUTO_CLEANUP));
   }
 

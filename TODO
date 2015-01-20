@@ -324,9 +324,12 @@ o Concurrency: move "purge cache" to background
         x make sure this is called after every operation (exception safe!)
             -> use BOOST_SCOPE_EXIT
 
-        o always add a page to the Changeset, even if in-memory or
-            recovery is disabled; make sure this is an atomic operation!
-        o page needs a mutex or atomic state ("unused", "in-use", "flushing")
+        x always add a page to the Changeset, even if in-memory or
+            recovery is disabled
+
+        o page needs a spinlock
+            o acquire lock when page is added to the changeset
+            o release lock when page is removed from the changeset
 
         o page must not be purged while it's "in use"
         o mark page as "in use" during purge
@@ -342,6 +345,8 @@ o Concurrency: move "purge cache" to background
 
     o review comment in Cache::purge and rewrite if necessary
         o but run performance tests
+
+    o run monster tests
 
 o PRO: retrieve better statistics regarding compression/overhead/payload
     o for each page retrieve those statistics and print them 
@@ -426,9 +431,50 @@ o More things to refactor in the btree
 o when splitting and HAM_HINT_APPEND is set, the new page is appended.
     do the same for prepend!
 
+o refactoring: reduce complexities by introducing "Operations". Each
+    operation (ham_env_create_db, ham_db_insert, etc) is an Operation.
+    At start, they perform sanity checks (i.e. verifying that the
+    changeset is empty). They create and manage local Transactions if
+    necessary. In the destructor they flush or clear the Changeset
+    and perform cleanups. The changeset is part of the operation.
+    Later, they will also store the caller's data in an Update structure.
+
+    Every operation returns a filled Changeset, and the Operation will
+    then proceed to work with it afterwards: either by ignoring/clearing
+    it or by flushing it.
+
+    This is the flow of ham_env_erase_db:
+        op = Operation<EraseDbState>(env); // locks env.mutex
+        op.state.db = db;
+        op.state.flags = flags;
+        st = env->erase(op);
+        if (st == 0)
+          op.commit()
+        else
+          op.abort()
+
+    This is the flow of ham_db_insert:
+        op = Operation<Update>(env); // locks env.mutex
+        op.state.db = db;
+        op.state.txn = txn;
+        op.state.key = key;
+        op.state.record = record;
+        op.state.flags = flags;
+        if (txn == 0)
+          op.state.txn = ham_txn_begin(...);
+        st = db->insert(op);
+        if (st == 0)
+          op.commit() // also commits local_txn
+        else
+          op.abort() // also aborts local_txn
+
 o refactoring: db_local.cc has so many TODOs!
-    o erase_impl: move cursor-related code to the caller
-    o erase_impl: move sanity checks about key->size to erase()
+    o each operation should follow this pattern:
+        1. perform db- or cursor-specific parameter checks
+        2. perform db- or cursor-specific logic
+        3. create local transaction (if required)
+        4. call _impl method
+        5. call finalize (BOOST_SCOPE_EXIT)
 
 . refactor LocalDatabase::cursor_insert: when done, the duplicate index is
     updated. In most cases (DUPLICATE_LAST), a duplicate table has to be built,

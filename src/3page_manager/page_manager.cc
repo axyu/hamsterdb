@@ -119,7 +119,7 @@ PageManager::store_state()
   uint32_t page_size = m_env->get_page_size();
 
   /* store the page in the changeset if recovery is enabled */
-  if (m_env->get_flags() & HAM_ENABLE_RECOVERY)
+  //if (m_env->get_flags() & HAM_ENABLE_RECOVERY)
     m_env->get_changeset().add_page(m_state_page);
 
   Page *page = m_state_page;
@@ -265,7 +265,7 @@ PageManager::fetch_page(LocalDatabase *db, uint64_t address,
     if (flags & kNoHeader)
       page->set_without_header(true);
     /* store the page in the changeset if recovery is enabled */
-    if (!(flags & kReadOnly) && m_env->get_flags() & HAM_ENABLE_RECOVERY)
+    //if (!(flags & kReadOnly) && m_env->get_flags() & HAM_ENABLE_RECOVERY)
       m_env->get_changeset().add_page(page);
     return (page);
   }
@@ -291,7 +291,7 @@ PageManager::fetch_page(LocalDatabase *db, uint64_t address,
     page->set_without_header(true);
 
   /* store the page in the changeset */
-  if (!(flags & kReadOnly) && m_env->get_flags() & HAM_ENABLE_RECOVERY)
+  //if (!(flags & kReadOnly) && m_env->get_flags() & HAM_ENABLE_RECOVERY)
     m_env->get_changeset().add_page(page);
 
   m_page_count_fetched++;
@@ -361,7 +361,7 @@ done:
   }
 
   /* an allocated page is always flushed if recovery is enabled */
-  if (m_env->get_flags() & HAM_ENABLE_RECOVERY)
+  //if (m_env->get_flags() & HAM_ENABLE_RECOVERY)
     m_env->get_changeset().add_page(page);
 
   /* store the page in the cache */
@@ -619,6 +619,13 @@ PageManager::close()
   delete m_state_page;
   m_state_page = 0;
   m_last_blob_page = 0;
+}
+
+void
+PageManager::test_remove_page(Page *page)
+{
+  m_cache.remove_page(page);
+  m_env->get_changeset().clear();
 }
 
 } // namespace hamsterdb

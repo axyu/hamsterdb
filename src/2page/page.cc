@@ -38,6 +38,10 @@ Page::Page(Device *device, LocalDatabase *db)
 Page::~Page()
 {
   ham_assert(m_cursor_list == 0);
+  for (int i = 0; i < kListMax; i++) {
+    ham_assert(m_next[i] == 0);
+    ham_assert(m_prev[i] == 0);
+  }
 
   if (m_node_proxy) {
     delete m_node_proxy;

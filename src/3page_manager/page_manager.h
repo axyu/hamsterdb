@@ -156,9 +156,7 @@ class PageManager {
     void close();
 
     // Removes a page from the list; only for testing.
-    void test_remove_page(Page *page) {
-      m_cache.remove_page(page);
-    }
+    void test_remove_page(Page *page);
 
     // Returns true if a page is free. Ignores multi-pages; only for
     // testing and integrity checks

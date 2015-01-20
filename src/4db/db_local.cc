@@ -733,6 +733,10 @@ LocalDatabase::get_parameters(ham_parameter_t *param)
 void
 LocalDatabase::check_integrity(uint32_t flags)
 {
+  ham_status_t st = 0;
+  Transaction *local_txn = 0;
+  FINALIZE_ON_SCOPE_EXIT(this, st, local_txn);
+
   /* purge cache if necessary */
   get_local_env()->get_page_manager()->purge_cache();
 
@@ -746,6 +750,10 @@ LocalDatabase::check_integrity(uint32_t flags)
 uint64_t
 LocalDatabase::count(Transaction *htxn, bool distinct)
 {
+  ham_status_t st = 0;
+  Transaction *local_txn = 0;
+  FINALIZE_ON_SCOPE_EXIT(this, st, local_txn);
+
   LocalTransaction *txn = dynamic_cast<LocalTransaction *>(htxn);
 
   /* purge cache if necessary */
@@ -769,6 +777,10 @@ LocalDatabase::count(Transaction *htxn, bool distinct)
 void
 LocalDatabase::scan(Transaction *txn, ScanVisitor *visitor, bool distinct)
 {
+  ham_status_t st = 0;
+  Transaction *local_txn = 0;
+  FINALIZE_ON_SCOPE_EXIT(this, st, local_txn);
+
   Page *page;
   ham_key_t key = {0};
 
@@ -778,7 +790,7 @@ LocalDatabase::scan(Transaction *txn, ScanVisitor *visitor, bool distinct)
   /* create a cursor, move it to the first key */
   Cursor *cursor = cursor_create(txn, 0);
 
-  ham_status_t st = cursor_move(cursor, &key, 0, HAM_CURSOR_FIRST);
+  st = cursor_move(cursor, &key, 0, HAM_CURSOR_FIRST);
   if (st) {
     cursor_close(cursor);
     throw Exception(st);
@@ -899,6 +911,8 @@ ham_status_t
 LocalDatabase::find(Transaction *txn, ham_key_t *key,
             ham_record_t *record, uint32_t flags)
 {
+  ham_status_t st = 0;
+
   /* if this database has duplicates, then we use ham_cursor_find
    * because we have to build a duplicate list, and this is currently
    * only available in ham_cursor_find
@@ -908,14 +922,15 @@ LocalDatabase::find(Transaction *txn, ham_key_t *key,
    */
   if (txn && get_rt_flags() & HAM_ENABLE_DUPLICATE_KEYS) {
     Cursor *c;
-    ham_status_t st = ham_cursor_create((ham_cursor_t **)&c, (ham_db_t *)this,
+    st = ham_cursor_create((ham_cursor_t **)&c, (ham_db_t *)this,
                     (ham_txn_t *)txn, HAM_DONT_LOCK);
     if (st == 0) {
       st = ham_cursor_find((ham_cursor_t *)c, key, record,
                       flags | HAM_DONT_LOCK);
       cursor_close(c);
     }
-    return (st);
+    LocalTransaction *local_txn = 0;
+    return (finalize(st, local_txn));
   }
 
   return (find_impl(0, txn, key, record, flags));
@@ -960,14 +975,19 @@ ham_status_t
 LocalDatabase::cursor_find(Cursor *cursor, ham_key_t *key,
           ham_record_t *record, uint32_t flags)
 {
+  ham_status_t st = 0;
+
   /* reset the dupecache */
   // TODO merge both calls, only set to nil if find() was successful
   cursor->clear_dupecache();
   cursor->set_to_nil(Cursor::kBoth);
 
-  ham_status_t st = find_impl(cursor, cursor->get_txn(), key, record, flags);
+  st = find_impl(cursor, cursor->get_txn(), key, record, flags);
   if (st)
     return (st);
+
+  LocalTransaction *local_txn = 0;
+  FINALIZE_ON_SCOPE_EXIT(this, st, local_txn);
 
   // TODO necessary? I think so, but check nevertheless
   if (get_rt_flags() & HAM_ENABLE_TRANSACTIONS) {
@@ -1014,18 +1034,30 @@ LocalDatabase::cursor_find(Cursor *cursor, ham_key_t *key,
 uint32_t
 LocalDatabase::cursor_get_record_count(Cursor *cursor, uint32_t flags)
 {
+  ham_status_t st = 0;
+  Transaction *local_txn = 0;
+  FINALIZE_ON_SCOPE_EXIT(this, st, local_txn);
+
   return (cursor->get_record_count(flags));
 }
 
 uint32_t
 LocalDatabase::cursor_get_duplicate_position(Cursor *cursor)
 {
+  ham_status_t st = 0;
+  Transaction *local_txn = 0;
+  FINALIZE_ON_SCOPE_EXIT(this, st, local_txn);
+
   return (cursor->get_duplicate_position());
 }
 
 uint64_t
 LocalDatabase::cursor_get_record_size(Cursor *cursor)
 {
+  ham_status_t st = 0;
+  Transaction *local_txn = 0;
+  FINALIZE_ON_SCOPE_EXIT(this, st, local_txn);
+
   return (cursor->get_record_size());
 }
 
@@ -1035,7 +1067,6 @@ LocalDatabase::cursor_overwrite(Cursor *cursor,
 {
   ham_status_t st = 0;
   Transaction *local_txn = 0;
-
   FINALIZE_ON_SCOPE_EXIT(this, st, local_txn);
 
   /* purge cache if necessary */
@@ -1065,6 +1096,10 @@ ham_status_t
 LocalDatabase::cursor_move(Cursor *cursor, ham_key_t *key,
         ham_record_t *record, uint32_t flags)
 {
+  ham_status_t st = 0;
+  Transaction *local_txn = 0;
+  FINALIZE_ON_SCOPE_EXIT(this, st, local_txn);
+
   /* purge cache if necessary */
   get_local_env()->get_page_manager()->purge_cache();
 
@@ -1095,8 +1130,6 @@ LocalDatabase::cursor_move(Cursor *cursor, ham_key_t *key,
         flags |= HAM_CURSOR_FIRST;
     }
   }
-
-  ham_status_t st = 0;
 
   /* in non-transactional mode - just call the btree function and return */
   if (!(get_rt_flags() & HAM_ENABLE_TRANSACTIONS)) {
@@ -1159,7 +1192,9 @@ LocalDatabase::close_impl(uint32_t flags)
 
   /* in-memory-database: free all allocated blobs */
   if (m_btree_index && m_env->get_flags() & HAM_IN_MEMORY)
-   m_btree_index->release();
+    m_btree_index->release();
+
+  get_local_env()->get_changeset().clear();
 
   /*
    * flush all pages of this database (but not the header page,
@@ -1370,6 +1405,11 @@ LocalDatabase::flush_txn_operation(LocalTransaction *txn,
 void
 LocalDatabase::erase_me()
 {
+  // make sure that the Changeset is cleared
+  ham_status_t st = 0;
+  Transaction *local_txn = 0;
+  FINALIZE_ON_SCOPE_EXIT(this, st, local_txn);
+
   m_btree_index->release();
 }
 
@@ -1545,8 +1585,6 @@ LocalDatabase::find_impl(Cursor *cursor, Transaction *htxn, ham_key_t *key,
   ham_status_t st = 0;
   LocalTransaction *local_txn = 0;
 
-  FINALIZE_ON_SCOPE_EXIT(this, st, local_txn);
-
   LocalTransaction *txn = dynamic_cast<LocalTransaction *>(htxn);
 
   if (m_config.key_size != HAM_KEY_SIZE_UNLIMITED
@@ -1567,6 +1605,8 @@ LocalDatabase::find_impl(Cursor *cursor, Transaction *htxn, ham_key_t *key,
     txn = local_txn;
   }
 
+  FINALIZE_ON_SCOPE_EXIT(this, st, local_txn);
+
   /*
    * if transactions are enabled: read keys from transaction trees,
    * otherwise read immediately from disk
@@ -1586,7 +1626,7 @@ LocalDatabase::find_impl(Cursor *cursor, Transaction *htxn, ham_key_t *key,
   if (cursor && local_txn)
     cursor->set_txn(0);
 
-  return (finalize(st, local_txn));
+  return (st);
 }
 
 ham_status_t
@@ -1680,23 +1720,21 @@ LocalDatabase::erase_impl(Cursor *cursor, Transaction *htxn, ham_key_t *key,
 ham_status_t
 LocalDatabase::finalize(ham_status_t status, Transaction *local_txn)
 {
-  if (status) {
-    if (local_txn) {
-      get_local_env()->get_changeset().clear();
-      get_local_env()->get_txn_manager()->abort(local_txn);
-    }
-    return (status);
-  }
-
-  if (local_txn) {
-    get_local_env()->get_changeset().clear();
-    get_local_env()->get_txn_manager()->commit(local_txn);
-  }
-  else if (m_env->get_flags() & HAM_ENABLE_RECOVERY
+  if (m_env->get_flags() & HAM_ENABLE_RECOVERY
       && !(m_env->get_flags() & HAM_ENABLE_TRANSACTIONS)) {
     get_local_env()->get_changeset().flush();
   }
-  return (0);
+  else {
+    get_local_env()->get_changeset().clear();
+    if (local_txn) {
+      if (status)
+        get_local_env()->get_txn_manager()->abort(local_txn);
+      else
+        get_local_env()->get_txn_manager()->commit(local_txn);
+    }
+  }
+
+  return (status);
 }
 
 } // namespace hamsterdb

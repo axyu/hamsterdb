@@ -53,8 +53,11 @@ struct BtreeInsertFixture {
   }
 
   ~BtreeInsertFixture() {
-    if (m_env)
+    if (m_env) {
+      LocalEnvironment *lenv = (LocalEnvironment *)m_env;
+      lenv->get_changeset().clear();
 	  REQUIRE(0 == ham_env_close(m_env, HAM_AUTO_CLEANUP));
+    }
   }
 
   Page *fetch_page(uint64_t address) {

@@ -34,6 +34,7 @@
 #include <boost/atomic.hpp>
 
 // Always verify that a file of level N does not include headers > N!
+#include "1base/error.h"
 
 #ifndef HAM_ROOT_H
 #  error "root.h was not included"
@@ -85,6 +86,7 @@ class Spinlock {
     }
 
     void unlock() {
+      ham_assert(m_state.load(boost::memory_order_release) == kLocked);
       m_state.store(kUnlocked, boost::memory_order_release);
     }
 

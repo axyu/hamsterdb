@@ -36,14 +36,14 @@ void (*g_CHANGESET_POST_LOG_HOOK)(void);
 void
 Changeset::add_page(Page *page)
 {
-  ham_assert(m_env->get_flags() & HAM_ENABLE_RECOVERY);
+  //ham_assert(m_env->get_flags() & HAM_ENABLE_RECOVERY);
   m_collection.add(page);
 }
 
 Page *
 Changeset::get_page(uint64_t pageid)
 {
-  ham_assert(m_env->get_flags() & HAM_ENABLE_RECOVERY);
+  //ham_assert(m_env->get_flags() & HAM_ENABLE_RECOVERY);
   return (m_collection.get(pageid));
 }
 

@@ -516,6 +516,8 @@ LocalEnvironment::flush(uint32_t flags)
   if (get_flags() & HAM_IN_MEMORY)
     return (0);
 
+  m_changeset.clear();
+
   /* flush all committed transactions */
   if (get_txn_manager())
     get_txn_manager()->flush_committed_txns();
@@ -530,7 +532,7 @@ LocalEnvironment::flush(uint32_t flags)
   /* flush the device - this usually causes a fsync() */
   device->flush();
 
-  return (HAM_SUCCESS);
+  return (0);
 }
 
 ham_status_t

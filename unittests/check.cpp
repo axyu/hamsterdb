@@ -16,8 +16,12 @@
 
 #include "3rdparty/catch/catch.hpp"
 
+#include "4env/env_local.h"
+
 #include "utils.h"
 #include "os.hpp"
+
+using namespace hamsterdb;
 
 struct CheckIntegrityFixture {
   CheckIntegrityFixture(bool inmemory = false, ham_parameter_t *env_params = 0,
@@ -39,6 +43,9 @@ struct CheckIntegrityFixture {
   } 
 
   void teardown() {
+    LocalEnvironment *lenv = (LocalEnvironment *)m_env;
+    lenv->get_changeset().clear();
+
     REQUIRE(0 == ham_db_close(m_db, 0));
     REQUIRE(0 == ham_env_close(m_env, 0));
   }

@@ -23,6 +23,7 @@
 #include "4txn/txn_cursor.h"
 #include "4txn/txn_local.h"
 #include "4env/env.h"
+#include "4env/env_local.h"
 #include "4cursor/cursor.h"
 
 #ifndef HAM_ROOT_H
@@ -347,7 +348,9 @@ TransactionCursor::test_insert(ham_key_t *key, ham_record_t *record,
 {
   LocalTransaction *txn = dynamic_cast<LocalTransaction *>(m_parent->get_txn());
 
-  return (get_db()->insert_txn(txn, key, record, flags, this));
+  ham_status_t st = get_db()->insert_txn(txn, key, record, flags, this);
+  ((LocalEnvironment *)txn->get_env())->get_changeset().clear();
+  return (st);
 }
 
 bool

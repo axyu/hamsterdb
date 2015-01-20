@@ -15,7 +15,7 @@
  */
 
 /*
- * @exception_safe: strong
+ * @exception_safe: nothrow
  * @thread_safe: no
  */
 

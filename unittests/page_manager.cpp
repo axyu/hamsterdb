@@ -54,6 +54,8 @@ struct PageManagerFixture {
   }
 
   ~PageManagerFixture() {
+    LocalEnvironment *lenv = (LocalEnvironment *)m_env;
+    lenv->get_changeset().clear();
     REQUIRE(0 == ham_env_close(m_env, HAM_AUTO_CLEANUP));
   }
 
@@ -326,6 +328,7 @@ struct PageManagerFixture {
     pm->m_needs_flush = true;
     uint64_t page_id = pm->store_state();
 
+    lenv->get_changeset().clear();
     pm->flush_all_pages();
     pm->m_free_pages.clear();
 
@@ -361,6 +364,7 @@ struct PageManagerFixture {
     pm->m_needs_flush = true;
     uint64_t page_id = pm->store_state();
 
+    lenv->get_changeset().clear();
     pm->flush_all_pages();
     pm->m_free_pages.clear();
     pm->m_last_blob_page_id = 0;

@@ -360,6 +360,7 @@ struct BtreeFixture {
     }
 #endif
 
+    lenv->get_changeset().clear();
     REQUIRE(0 == ham_env_close(env, HAM_AUTO_CLEANUP));
   }
 
