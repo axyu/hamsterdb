@@ -187,11 +187,6 @@ class DupeCache {
       return (&m_elements[idx]);
     }
 
-    // Returns a pointer to the first element from the cache
-    DupeCacheLine *get_first_element() {
-      return (&m_elements[0]);
-    }
-
     // Clones this dupe-cache into 'other'
     void clone(DupeCache *other) {
       other->m_elements = m_elements;
@@ -250,7 +245,7 @@ class Cursor
       // Cursor flag: cursor is coupled to the txn-cursor
       kCoupledToTxn      = 0x1000000,
 
-      // Flag for set_lastop()
+      // Flag for set_last_operation()
       kLookupOrInsert    = 0x10000
     };
 
@@ -276,11 +271,26 @@ class Cursor
       return (m_txn);
     }
 
-    // Sets the Transaction handle; often used to assign a temporary
-    // Transaction to this cursor
-    // TODO really required?
-    void set_txn(Transaction *txn) {
-      m_txn = txn;
+    // Returns the Transaction cursor
+    // TODO required?
+    TransactionCursor *get_txn_cursor() {
+      return (&m_txn_cursor);
+    }
+
+    // Returns the Btree cursor
+    // TODO required?
+    BtreeCursor *get_btree_cursor() {
+      return (&m_btree_cursor);
+    }
+
+    // Returns the remote Cursor handle
+    uint64_t get_remote_handle() {
+      return (m_remote_handle);
+    }
+
+    // Returns the remote Cursor handle
+    void set_remote_handle(uint64_t handle) {
+      m_remote_handle = handle;
     }
 
     // Sets the cursor to nil
@@ -335,22 +345,6 @@ class Cursor
     // Closes an existing cursor (ham_cursor_close)
     void close();
 
-    // Updates (or builds) the dupecache for a cursor
-    //
-    // The |what| parameter specifies if the dupecache is initialized from
-    // btree (kBtree), from txn (kTxn) or both.
-    void update_dupecache(Context *context, uint32_t what);
-
-    // Appends the duplicates of the BtreeCursor to the duplicate cache.
-    void append_btree_duplicates(Context *context, BtreeCursor *btc,
-                    DupeCache *dc);
-
-    // Clears the dupecache and disconnect the Cursor from any duplicate key
-    void clear_dupecache() {
-      m_dupecache.clear();
-      set_dupecache_index(0);
-    }
-
     // Couples the cursor to a duplicate in the dupe table
     // dupe_id is a 1 based index!!
     void couple_to_dupe(uint32_t dupe_id);
@@ -368,9 +362,12 @@ class Cursor
 
     // Returns the number of duplicates in the duplicate cache
     // The duplicate cache is updated if necessary
-    uint32_t get_dupecache_count(Context *context) {
+    uint32_t get_dupecache_count(Context *context, bool clear_cache = false) {
       if (!(m_db->get_flags() & HAM_ENABLE_DUPLICATE_KEYS))
         return (0);
+
+      if (clear_cache)
+        clear_dupecache();
 
       TransactionCursor *txnc = get_txn_cursor();
       if (txnc->get_coupled_op())
@@ -400,28 +397,6 @@ class Cursor
       m_previous = previous;
     }
 
-    // Returns the Transaction cursor
-    // TODO required?
-    TransactionCursor *get_txn_cursor() {
-      return (&m_txn_cursor);
-    }
-
-    // Returns the Btree cursor
-    // TODO required?
-    BtreeCursor *get_btree_cursor() {
-      return (&m_btree_cursor);
-    }
-
-    // Returns the remote Cursor handle
-    uint64_t get_remote_handle() {
-      return (m_remote_handle);
-    }
-
-    // Returns the remote Cursor handle
-    void set_remote_handle(uint64_t handle) {
-      m_remote_handle = handle;
-    }
-
     // Returns a pointer to the duplicate cache
     // TODO really required?
     DupeCache *get_dupecache() {
@@ -440,24 +415,42 @@ class Cursor
     }
 
     // Sets the current index in the dupe cache
+    // TODO rename to set_duplicate_position()
     void set_dupecache_index(uint32_t index) {
       m_dupecache_index = index;
     }
 
     // Returns true if this cursor was never used before
-    // TODO this is identical to is_nil()??
     bool is_first_use() const {
       return (m_is_first_use);
     }
 
     // Stores the current operation; needed for ham_cursor_move
     // TODO should be private
-    void set_lastop(uint32_t lastop) {
-      m_lastop = lastop;
+    void set_last_operation(uint32_t last_operation) {
+      m_last_operation = last_operation;
       m_is_first_use = false;
     }
 
   private:
+    friend struct TxnCursorFixture;
+
+    // Clears the dupecache and disconnect the Cursor from any duplicate key
+    void clear_dupecache() {
+      m_dupecache.clear();
+      set_dupecache_index(0);
+    }
+
+    // Updates (or builds) the dupecache for a cursor
+    //
+    // The |what| parameter specifies if the dupecache is initialized from
+    // btree (kBtree), from txn (kTxn) or both.
+    void update_dupecache(Context *context, uint32_t what);
+
+    // Appends the duplicates of the BtreeCursor to the duplicate cache.
+    void append_btree_duplicates(Context *context, BtreeCursor *btc,
+                    DupeCache *dc);
+
     // Checks if a btree cursor points to a key that was overwritten or erased
     // in the txn-cursor
     //
@@ -539,7 +532,7 @@ class Cursor
     // The last operation (insert/find or move); needed for
     // ham_cursor_move. Values can be HAM_CURSOR_NEXT,
     // HAM_CURSOR_PREVIOUS or CURSOR_LOOKUP_INSERT
-    uint32_t m_lastop;
+    uint32_t m_last_operation;
 
     // The result of the last compare operation
     int m_last_cmp;
