@@ -685,7 +685,6 @@ PageManager::safely_lock_page(Context *context, Page *page,
 {
   Page::PersistedData *old_data = 0;
 
-#if 0
   // if the page is not yet in the changeset, but already locked: create a copy!
   if (!context->changeset.has(page)) {
     if (page->mutex().try_lock() == false)
@@ -694,7 +693,6 @@ PageManager::safely_lock_page(Context *context, Page *page,
     else
       page->mutex().unlock();
   }
-#endif
 
   context->changeset.put(page);
 
@@ -707,12 +705,12 @@ PageManager::safely_lock_page(Context *context, Page *page,
   return (page);
 }
 
-Page *
-PageManager::try_fetch(uint64_t page_id)
+Page::PersistedData *
+PageManager::try_fetch_page_data(uint64_t page_id)
 {
   Page *page = m_state.cache.get(page_id);
   if (page && page->mutex().try_lock())
-    return (page);
+    return (page->get_persisted_data());
   return (0);
 }
 
